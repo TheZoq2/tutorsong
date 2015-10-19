@@ -1,0 +1,286 @@
+68K GAS  ./spel.s 			page 1
+
+
+   1               	    ;
+   2               	    ; Spelet "Sänka fartyg"
+   3               	    ; Labskelett att komplettera
+   4               	    ; Version 1.1
+   5               	    ; Programstrukturen är given. Några rutiner saknas. 
+   6               	    ; Det som måste kompletteras är markerat med '; ***'
+   7               	    ; PIA:n skall anslutas/konfigureras enligt följande:
+   8               	    ; PIAA b7-b6  A/D-omvandlare i X-led
+   9               	    ;b5-b4A/D-omvandlare i Y-lehd
+  10               	    ;b3anv�nds inte
+  11               	    ;b2-b0Styr diodmatrisens multiplexingångar
+  12               	    ;
+  13               	    ; CA   b2     Signal till högtalare
+  14               	    ;b1Avbrottssignal för MUX-rutinen
+  15               	    ;
+  16               	    ; PIAB b7     Används inte
+  17               	    ;b6-b0Diodmatrisens bitmönster
+  18               	    ;
+  19               	    ; CB   b2     Starta omvandling hos A/D-omvandlare
+  20               	    ;b1Används inte
+  21               	    ; jump to program
+  22               	PIAINIT
+  23 0000 4239 0001 	    CLR.B    $10084          ; Set CRA to change I/O
+  23      0084 
+  24 0006 13FC 00EF 	    MOVE.B   #$EF,$10080     ; Hela port A utsignal
+  24      0001 0080 
+  25 000e 13FC 0004 	    MOVE.B   #$4,$10084     ; Set CRA for interrupts #00010111 ca1=interrupt, ca2 input
+  25      0001 0084 
+  26 0016 4239 0001 	    CLR.B    $10086          ; Nollst ̈all CRB
+  26      0086 
+  27 001c 13FC 0087 	    MOVE.B   #$87,$10082     ; Hela port B utsignal / insignal
+  27      0001 0082 
+  28 0024 13FC 0004 	    MOVE.B   #$4,$10086     ; CRB slutv ̈arde #00111111 CB1 initerrupt, CB2 output currently high
+  28      0001 0086 
+  29               	
+  30               	    ;Set default values for all the pins
+  31 002c 42B9 0001 	    CLR.L  $10080
+  31      0080 
+  32 0032 42B9 0001 	    CLR.L  $10082
+  32      0082 
+  33               	
+  34               	; Make a silly sound
+  35               	;
+  36               	SONG
+  37               	    ; *** skriv kod för en utsignal med lämlig frekvens som   ; ***
+  38               	    ; *** ska markera träff                                   ; ***
+  39               	
+  40               	MAIN:
+  41 0038 4FF9 0000 	    LEA $8000,A7
+  41      8000 
+  42               	                                ; Programmera PIA: nollställ CRA
+  43               	                                ; och nollställ CRB
+  44               	                                ; Programmera DDRA och DDRB.
+  45               	                                ; En bit utgång, resten ingångar
+  46 003e 41FA 0052 	    LEA LOADSONG,A0                ; Sätt A0 till att peka på strängen
+  47               	NEXTCH:
+  48 0042 31D8 3102 	    MOVE.W (A0)+,$3102             ; Hämta nästa tecken
+68K GAS  ./spel.s 			page 2
+
+
+  49 0046 31D8 3106 	    MOVE.W (A0)+,$3106
+  50 004a 0C38 0000 	    CMP.B #0,$3103                   ; Om D0=0: sträng slut, gå till END
+  50      3103 
+  51 0050 6706      	    BEQ END
+  52 0052 610A      	    BSR SEND                    ; Annars: anropa SEND
+  53 0054 4EFA FFEC 	    JMP NEXTCH                  ; Gå till NEXTCH för nästa tecken
+  54               	END:
+  55 0058 1E3C 00E4 	    MOVE.B #228,D7
+  56 005c 4E4E      	    TRAP #14
+  57               	
+  58               	SEND:
+  59 005e 3238 3106 	    MOVE.w $3106,D1             ; Hämta antal perioder N för prick
+  60 0062 143C 0001 	    MOVE.B #1,D2                ; Ladda D2 med 1 för ton
+  61 0066 6102      	    BSR BEEP                    ; Sänd ut prick/streck
+  62 0068 4E75      	    RTS                         ; Hoppa tillbaka från subrutinen
+  63               	
+  64               	BEEP:                           ; Om D2=1: ettställ utbiten,
+  65 006a 0C02 0001 	    CMP.B #1,D2                 ; annars nollställ utbiten.
+  66 006e 08F9 0007 	    BSET #7,$10082                 ; (Tips: instruktionen Scc!)
+  66      0001 0082 
+  67 0076 6110      	    BSR DELAY                   ; Vänta en halv period
+  68 0078 08B9 0007 	    BCLR #7,$10082                ; Nollställ utbiten
+  68      0001 0082 
+  69 0080 6106      	    BSR DELAY                   ; Vänta en halv period
+  70 0082 5341      	    SUBQ.W #1,D1                ; Räkna ned D1
+  71 0084 66E4      	    BNE BEEP                    ; Om D1>0: fortsätt pipa
+  72 0086 4E75      	    RTS
+  73               	
+  74               	DELAY:
+  75 0088 3638 3102 	    MOVE.w $3102,D3             ; Hämta fördröjning T
+  76               	WAIT:
+  77 008c 5343      	    SUBQ.w #1,D3                ; Räkna ned med 1
+  78 008e 66FC      	    BNE WAIT                    ; Om D3<>0: räkna vidare
+  79 0090 4E75      	    RTS                         ; Hoppa tillbaka
+  80               	   
+  81               	    
+  82               	LOADSONG
+  83 0092 01EF      	    DC.W $1ef
+  84 0094 0058      	    DC.W $58
+  85 0096 1108      	    DC.W $1108
+  86 0098 0002      	    DC.W $2
+  87 009a 01EF      	    DC.W $1ef
+  88 009c 0058      	    DC.W $58
+  89 009e 1108      	    DC.W $1108
+  90 00a0 0002      	    DC.W $2
+  91 00a2 01EF      	    DC.W $1ef
+  92 00a4 0058      	    DC.W $58
+  93 00a6 1108      	    DC.W $1108
+  94 00a8 0002      	    DC.W $2
+  95 00aa 0270      	    DC.W $270
+  96 00ac 0034      	    DC.W $34
+  97 00ae 1108      	    DC.W $1108
+  98 00b0 0002      	    DC.W $2
+  99 00b2 0341      	    DC.W $341
+ 100 00b4 000D      	    DC.W $d
+ 101 00b6 1108      	    DC.W $1108
+ 102 00b8 0002      	    DC.W $2
+68K GAS  ./spel.s 			page 3
+
+
+ 103 00ba 01EF      	    DC.W $1ef
+ 104 00bc 0058      	    DC.W $58
+ 105 00be 1108      	    DC.W $1108
+ 106 00c0 0002      	    DC.W $2
+ 107 00c2 0270      	    DC.W $270
+ 108 00c4 0034      	    DC.W $34
+ 109 00c6 1108      	    DC.W $1108
+ 110 00c8 0002      	    DC.W $2
+ 111 00ca 0341      	    DC.W $341
+ 112 00cc 000D      	    DC.W $d
+ 113 00ce 1108      	    DC.W $1108
+ 114 00d0 0002      	    DC.W $2
+ 115 00d2 01EF      	    DC.W $1ef
+ 116 00d4 00B0      	    DC.W $b0
+ 117 00d6 1108      	    DC.W $1108
+ 118 00d8 0002      	    DC.W $2
+ 119 00da 014B      	    DC.W $14b
+ 120 00dc 0084      	    DC.W $84
+ 121 00de 1108      	    DC.W $1108
+ 122 00e0 0002      	    DC.W $2
+ 123 00e2 014B      	    DC.W $14b
+ 124 00e4 0084      	    DC.W $84
+ 125 00e6 1108      	    DC.W $1108
+ 126 00e8 0002      	    DC.W $2
+ 127 00ea 014B      	    DC.W $14b
+ 128 00ec 0084      	    DC.W $84
+ 129 00ee 1108      	    DC.W $1108
+ 130 00f0 0002      	    DC.W $2
+ 131 00f2 0138      	    DC.W $138
+ 132 00f4 0069      	    DC.W $69
+ 133 00f6 1108      	    DC.W $1108
+ 134 00f8 0002      	    DC.W $2
+ 135 00fa 0341      	    DC.W $341
+ 136 00fc 000D      	    DC.W $d
+ 137 00fe 1108      	    DC.W $1108
+ 138 0100 0002      	    DC.W $2
+ 139 0102 020D      	    DC.W $20d
+ 140 0104 0053      	    DC.W $53
+ 141 0106 1108      	    DC.W $1108
+ 142 0108 0002      	    DC.W $2
+ 143 010a 0270      	    DC.W $270
+ 144 010c 0034      	    DC.W $34
+ 145 010e 1108      	    DC.W $1108
+ 146 0110 0002      	    DC.W $2
+ 147 0112 0341      	    DC.W $341
+ 148 0114 000D      	    DC.W $d
+ 149 0116 1108      	    DC.W $1108
+ 150 0118 0002      	    DC.W $2
+ 151 011a 01EF      	    DC.W $1ef
+ 152 011c 00B0      	    DC.W $b0
+ 153 011e 1108      	    DC.W $1108
+ 154 0120 0002      	    DC.W $2
+ 155 0122 00F8      	    DC.W $f8
+ 156 0124 00B0      	    DC.W $b0
+ 157 0126 1108      	    DC.W $1108
+ 158 0128 0002      	    DC.W $2
+ 159 012a 01EF      	    DC.W $1ef
+68K GAS  ./spel.s 			page 4
+
+
+ 160 012c 0042      	    DC.W $42
+ 161 012e 1108      	    DC.W $1108
+ 162 0130 0002      	    DC.W $2
+ 163 0132 01EF      	    DC.W $1ef
+ 164 0134 0016      	    DC.W $16
+ 165 0136 1108      	    DC.W $1108
+ 166 0138 0002      	    DC.W $2
+ 167 013a 00F8      	    DC.W $f8
+ 168 013c 00B0      	    DC.W $b0
+ 169 013e 1108      	    DC.W $1108
+ 170 0140 0002      	    DC.W $2
+ 171 0142 0106      	    DC.W $106
+ 172 0144 007D      	    DC.W $7d
+ 173 0146 1108      	    DC.W $1108
+ 174 0148 0002      	    DC.W $2
+ 175 014a 0116      	    DC.W $116
+ 176 014c 0027      	    DC.W $27
+ 177 014e 1108      	    DC.W $1108
+ 178 0150 0002      	    DC.W $2
+ 179 0152 0127      	    DC.W $127
+ 180 0154 0025      	    DC.W $25
+ 181 0156 1108      	    DC.W $1108
+ 182 0158 0002      	    DC.W $2
+ 183 015a 0138      	    DC.W $138
+ 184 015c 0023      	    DC.W $23
+ 185 015e 1108      	    DC.W $1108
+ 186 0160 0002      	    DC.W $2
+ 187 0162 0127      	    DC.W $127
+ 188 0164 004A      	    DC.W $4a
+ 189 0166 1108      	    DC.W $1108
+ 190 0168 0002      	    DC.W $2
+ 191 016a 1108      	    DC.W $1108
+ 192 016c 0005      	    DC.W $5
+ 193 016e 1108      	    DC.W $1108
+ 194 0170 0002      	    DC.W $2
+ 195 0172 01D4      	    DC.W $1d4
+ 196 0174 002F      	    DC.W $2f
+ 197 0176 1108      	    DC.W $1108
+ 198 0178 0002      	    DC.W $2
+ 199 017a 015E      	    DC.W $15e
+ 200 017c 007C      	    DC.W $7c
+ 201 017e 1108      	    DC.W $1108
+ 202 0180 0002      	    DC.W $2
+ 203 0182 0173      	    DC.W $173
+ 204 0184 0058      	    DC.W $58
+ 205 0186 1108      	    DC.W $1108
+ 206 0188 0002      	    DC.W $2
+ 207 018a 0189      	    DC.W $189
+ 208 018c 001C      	    DC.W $1c
+ 209 018e 1108      	    DC.W $1108
+ 210 0190 0002      	    DC.W $2
+ 211 0192 01A1      	    DC.W $1a1
+ 212 0194 001A      	    DC.W $1a
+ 213 0196 1108      	    DC.W $1108
+ 214 0198 0002      	    DC.W $2
+ 215 019a 01B9      	    DC.W $1b9
+ 216 019c 0019      	    DC.W $19
+68K GAS  ./spel.s 			page 5
+
+
+ 217 019e 1108      	    DC.W $1108
+ 218 01a0 0002      	    DC.W $2
+ 219 01a2 01A1      	    DC.W $1a1
+ 220 01a4 0034      	    DC.W $34
+ 221 01a6 1108      	    DC.W $1108
+ 222 01a8 0002      	    DC.W $2
+ 223 01aa 1108      	    DC.W $1108
+ 224 01ac 0005      	    DC.W $5
+ 225 01ae 1108      	    DC.W $1108
+ 226 01b0 0002      	    DC.W $2
+ 227 01b2 0270      	    DC.W $270
+ 228 01b4 0023      	    DC.W $23
+ 229 01b6 1108      	    DC.W $1108
+ 230 01b8 0002      	    DC.W $2
+ 231 01ba 020D      	    DC.W $20d
+ 232 01bc 0053      	    DC.W $53
+ 233 01be 1108      	    DC.W $1108
+ 234 01c0 0002      	    DC.W $2
+ 235 01c2 0270      	    DC.W $270
+ 236 01c4 0034      	    DC.W $34
+ 237 01c6 1108      	    DC.W $1108
+ 238 01c8 0002      	    DC.W $2
+ 239 01ca 020D      	    DC.W $20d
+ 240 01cc 0015      	    DC.W $15
+ 241 01ce 1108      	    DC.W $1108
+ 242 01d0 0002      	    DC.W $2
+ 243 01d2 01A1      	    DC.W $1a1
+ 244 01d4 0069      	    DC.W $69
+ 245 01d6 1108      	    DC.W $1108
+ 246 01d8 0002      	    DC.W $2
+ 247 01da 020D      	    DC.W $20d
+ 248 01dc 003E      	    DC.W $3e
+ 249 01de 1108      	    DC.W $1108
+ 250 01e0 0002      	    DC.W $2
+ 251 01e2 01A1      	    DC.W $1a1
+ 252 01e4 001A      	    DC.W $1a
+ 253 01e6 1108      	    DC.W $1108
+ 254 01e8 0002      	    DC.W $2
+ 255 01ea 014B      	    DC.W $14b
+ 256 01ec 0108      	    DC.W $108
+ 257 01ee 1108      	    DC.W $1108
+ 258 01f0 0002      	    DC.W $2
+ 259 01f2 0000      	    DC.W 0

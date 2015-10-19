@@ -1,0 +1,9 @@
+#!/bin/bash
+
+SCRIPTPATH=~/Documents/python
+
+python3 $SCRIPTPATH/cpusong.py > $SCRIPTPATH/soong
+cat ${1} $SCRIPTPATH/soong > out.s
+
+assemble.sh out.s
+cp a.out ~/
